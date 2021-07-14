@@ -11,7 +11,6 @@ import (
 	"log"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/gorilla/sessions"
 	"github.com/gorilla/websocket"
@@ -99,11 +98,19 @@ func HandleRoot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client, err := helix.NewClient(&helix.Options{ClientID: clientID})
+	client, err := helix.NewClient(&helix.Options{ClientID: clientID, ClientSecret: clientSecret})
 	if err != nil {
 		log.Println("HandleRoot > NewClient:", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
+	}
+	validateToken, _, _ := client.ValidateToken(token.AccessToken)
+	if !validateToken {
+		if token, err = refreshToken(w, r, client, token.RefreshToken); err != nil {
+			log.Println("HandleRoot > refreshToken:", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 	}
 	client.SetUserAccessToken(token.AccessToken)
 
@@ -114,6 +121,7 @@ func HandleRoot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(user.Data.Users) == 0 {
+		// TODO: dar logout...
 		log.Println("HandleRoot > len(userData.Users):", len(user.Data.Users))
 		return
 	}
@@ -137,6 +145,24 @@ func HandleRoot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_, err = w.Write(parsed.Bytes())
+}
+
+func refreshToken(w http.ResponseWriter, r *http.Request, client *helix.Client, refreshToken string) (*helix.AccessCredentials, error) {
+	resp, err := client.RefreshUserAccessToken(refreshToken)
+	if err != nil {
+		return nil, err
+	}
+	session, err := cookieStore.Get(r, oauthSessionName)
+	if err != nil {
+		log.Printf("corrupted session %s -- generated new", err)
+		err = nil
+	}
+	session.Values[oauthTokenKey] = resp.Data
+	err = session.Save(r, w)
+	if err != nil {
+		return nil, err
+	}
+	return &resp.Data, nil
 }
 
 // HandleLogin is a Handler that redirects the user to Twitch for login, and provides the 'state'
@@ -256,7 +282,9 @@ func HandleLayer(w http.ResponseWriter, r *http.Request) {
 	_, err = w.Write(parsed.Bytes())
 }
 
-func HandleWebsocket(w http.ResponseWriter, r *http.Request) {
+// HandleWebsocket
+// arquitetura chupinhada daqui: https://github.com/gorilla/websocket/tree/master/examples/chat
+func HandleWebsocket(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	log.Println("HandleWebsocket > URL:", r.URL)
 	split := strings.Split(r.URL.Path, "/")
 	if len(split) != 3 {
@@ -272,65 +300,62 @@ func HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	const (
-		writeWait  = 10 * time.Second    // Time allowed to read the data from the client.
-		pongWait   = 60 * time.Second    // Time allowed to read the next pong message from the client.
-		pingPeriod = (pongWait * 9) / 10 // Send pings to client with this period. Must be less than pongWait.
-	)
-	pingTicker := time.NewTicker(pingPeriod)
-	defer func() {
-		log.Println("WS Handler: Exiting from wsHandler")
-		pingTicker.Stop()
-		_ = conn.Close()
-	}()
+	client := &Client{id: userID, hub: hub, conn: conn, send: make(chan []byte, 256)}
+	client.hub.register <- client
 
-	for {
-		select {
-		// COLA: https://github.com/gorilla/websocket/blob/master/examples/chat/client.go
-		//case message, ok := <-c.send:
-		//	conn.SetWriteDeadline(time.Now().Add(writeWait))
-		//	if !ok {
-		//		// The hub closed the channel.
-		//		conn.WriteMessage(websocket.CloseMessage, []byte{})
-		//		return
-		//	}
-		//
-		//	w, err := conn.NextWriter(websocket.TextMessage)
-		//	if err != nil {
-		//		return
-		//	}
-		//	w.Write(message)
-		//
-		//	// Add queued chat messages to the current websocket message.
-		//	n := len(c.send)
-		//	for i := 0; i < n; i++ {
-		//		w.Write(newline)
-		//		w.Write(<-c.send)
-		//	}
-		//
-		//	if err := w.Close(); err != nil {
-		//		return
-		//	}
-		case <-pingTicker.C:
-			_ = conn.SetWriteDeadline(time.Now().Add(writeWait))
-			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				return
-			}
-		}
+	// Allow collection of memory referenced by the caller by doing all work in
+	// new goroutines.
+	go client.writePump()
+	go client.readPump()
+}
+
+func HandleTTS(hub *Hub, w http.ResponseWriter, r *http.Request) {
+	log.Println("HandleTTS > URL:", r.URL)
+	split := strings.Split(r.URL.Path, "/")
+	if len(split) != 3 {
+		log.Println("HandleWebsocket > len(split):", len(split))
+		return
 	}
-	log.Println("HandleWebsocket: conectado:", conn.LocalAddr(), userID)
+	userID := split[2]
+
+	// verifica se canal está on
+	if _, found := hub.clients[userID]; !found {
+		log.Println("HandleTTS > hub.clients not found:", userID)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// vai na cybervox gerar o audio...
+	// "ola mundo" -> https://cybervox/.../ola_mundo.wav
+	text := r.FormValue("text")
+	log.Println(`"indo na cybervox"... para falar:`, text)
+
+	// manda url do audio para o websocket do canal
+	hub.broadcast <- &Message{
+		clientID: userID,
+		message:  []byte("https://api.cybervox.ai/play/tts:45f7148d-d84a-408a-b280-1a429b265c1b"),
+	}
 }
 
 func main() {
 	// Gob encoding for helix/AccessCredentials
 	gob.Register(&helix.AccessCredentials{})
 
+	// TODO: hub se conecta no cybervox...
+	hub := newHub()
+	go hub.run()
+
 	mux := http.DefaultServeMux
 	mux.HandleFunc("/login", HandleLogin)
 	mux.HandleFunc("/logout", HandleLogout)
 	mux.HandleFunc("/redirect", HandleOAuth2Callback)
 	mux.HandleFunc("/layer/", HandleLayer)
-	mux.HandleFunc("/ws/", HandleWebsocket)
+	mux.HandleFunc("/ws/", func(w http.ResponseWriter, r *http.Request) {
+		HandleWebsocket(hub, w, r)
+	})
+	mux.HandleFunc("/tts/", func(w http.ResponseWriter, r *http.Request) {
+		HandleTTS(hub, w, r)
+	})
 	mux.HandleFunc("/", HandleRoot)
 
 	fmt.Println("Started running on http://localhost:7001")
