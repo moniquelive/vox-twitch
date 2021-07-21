@@ -1,6 +1,7 @@
 # TODO:
 
-testar: https://github.com/nicklaw5/helix
+- remover a dependência em go-requests
+- fazer cybervox.TTS retornar erros ao invés de imprimi-los
 
 ## Site de autenticação
 

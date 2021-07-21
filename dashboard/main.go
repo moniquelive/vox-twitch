@@ -14,6 +14,7 @@ import (
 
 	"github.com/gorilla/sessions"
 	"github.com/gorilla/websocket"
+	"github.com/moniquelive/vox-twitch/dashboard/cybervox"
 	"github.com/nicklaw5/helix"
 )
 
@@ -41,6 +42,12 @@ var clientID string
 
 //go:embed .oauth_client_secret
 var clientSecret string
+
+//go:embed .vox_client_id
+var voxClientID string
+
+//go:embed .vox_client_secret
+var voxClientSecret string
 
 //go:embed index.html
 var indexHtml string
@@ -98,7 +105,10 @@ func HandleRoot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client, err := helix.NewClient(&helix.Options{ClientID: clientID, ClientSecret: clientSecret})
+	client, err := helix.NewClient(&helix.Options{
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+	})
 	if err != nil {
 		log.Println("HandleRoot > NewClient:", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -300,7 +310,20 @@ func HandleWebsocket(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := &Client{id: userID, hub: hub, conn: conn, send: make(chan []byte, 256)}
+	// Connect to Cybervox API websocket
+	var cybervoxWS *websocket.Conn
+	if cybervoxWS, _, err = cybervox.Dial(voxClientID, voxClientSecret); err != nil {
+		log.Println("HandleWebsocket: cybervox connect error:", err)
+		return
+	}
+
+	client := &Client{
+		id:         userID,
+		hub:        hub,
+		conn:       conn,
+		cybervoxWS: cybervoxWS,
+		send:       make(chan []byte, 256),
+	}
 	client.hub.register <- client
 
 	// Allow collection of memory referenced by the caller by doing all work in
@@ -328,12 +351,19 @@ func HandleTTS(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	// vai na cybervox gerar o audio...
 	// "ola mundo" -> https://cybervox/.../ola_mundo.wav
 	text := r.FormValue("text")
-	log.Println(`"indo na cybervox"... para falar:`, text)
-
+	var url string
+	if c, ok := hub.clients[userID]; ok {
+		var err error
+		if url, err = c.TTS(text); err != nil {
+			log.Println("HandleTTS > error calling cybervox:", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	}
 	// manda url do audio para o websocket do canal
 	hub.broadcast <- &Message{
 		clientID: userID,
-		message:  []byte("https://api.cybervox.ai/play/tts:45f7148d-d84a-408a-b280-1a429b265c1b"),
+		message:  []byte(url),
 	}
 }
 

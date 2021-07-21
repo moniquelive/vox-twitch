@@ -4,6 +4,10 @@
 
 package main
 
+import (
+	"github.com/gorilla/websocket"
+)
+
 type Message struct {
 	clientID string
 	message []byte
@@ -40,7 +44,9 @@ func (h *Hub) run() {
 		case client := <-h.register:
 			h.clients[client.id] = client
 		case client := <-h.unregister:
-			if _, ok := h.clients[client.id]; ok {
+			if c, ok := h.clients[client.id]; ok {
+				c.cybervoxWS.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+				c.cybervoxWS.Close()
 				delete(h.clients, client.id)
 				close(client.send)
 			}

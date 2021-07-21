@@ -6,10 +6,12 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"log"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/moniquelive/vox-twitch/dashboard/cybervox"
 )
 
 const (
@@ -42,6 +44,9 @@ type Client struct {
 
 	// Buffered channel of outbound messages.
 	send chan []byte
+
+	// CyberVox API websocket
+	cybervoxWS *websocket.Conn
 }
 
 // readPump pumps messages from the websocket connection to the hub.
@@ -115,4 +120,12 @@ func (c *Client) writePump() {
 			}
 		}
 	}
+}
+
+func (c *Client) TTS(text string) (string, error) {
+	ttsResponse := cybervox.TTS(c.cybervoxWS, text, "perola")
+	if !ttsResponse.Payload.Success {
+		return "", fmt.Errorf("client.TTS failed: %q", ttsResponse.Payload.Reason)
+	}
+	return "https://api.cybervox.ai" + ttsResponse.Payload.AudioURL, nil
 }
