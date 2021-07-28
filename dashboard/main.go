@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/golang-jwt/jwt"
 	"github.com/gorilla/sessions"
 	"github.com/gorilla/websocket"
 	"github.com/moniquelive/vox-twitch/dashboard/cybervox"
@@ -332,14 +333,52 @@ func HandleWebsocket(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	go client.readPump()
 }
 
+func setupCORS(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+	w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+}
+
 func HandleTTS(hub *Hub, w http.ResponseWriter, r *http.Request) {
+	setupCORS(w, r)
+	if r.Method == "OPTIONS" {
+		return
+	}
+
 	log.Println("HandleTTS > URL:", r.URL)
 	split := strings.Split(r.URL.Path, "/")
 	if len(split) != 3 {
 		log.Println("HandleWebsocket > len(split):", len(split))
 		return
 	}
-	userID := split[2]
+	authHeader := ""
+	tokenString := ""
+	if authHeader = r.Header.Get("Authorization"); authHeader != "" {
+		tokenString = strings.Split(authHeader, " ")[1]
+	}
+	if tokenString == "" {
+		log.Println("HandleTTS > empty TokenString:", authHeader)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	var token *jwt.Token
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(""), nil
+	})
+	//if err != nil {
+	//	log.Println("HandleTTS > error parsing jwt:", err)
+	//	w.WriteHeader(http.StatusInternalServerError)
+	//	return
+	//}
+	userID := ""
+	if claims, ok := token.Claims.(jwt.MapClaims); ok { //&& token.Valid {
+		userID = claims["channel_id"].(string)
+	} else {
+		fmt.Println(err)
+	}
 
 	// verifica se canal está on
 	if _, found := hub.clients[userID]; !found {
@@ -349,7 +388,6 @@ func HandleTTS(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	}
 
 	// vai na cybervox gerar o audio...
-	// "ola mundo" -> https://cybervox/.../ola_mundo.wav
 	text := r.FormValue("text")
 	var url string
 	if c, ok := hub.clients[userID]; ok {

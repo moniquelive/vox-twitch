@@ -1,2 +1,4 @@
+.idea
 .oauth_client*
 .vox_client*
+**/node_modules

@@ -1,5 +1,6 @@
 # TODO:
 
+- colocar esquema de ping na api da cybervox
 - remover a dependência em go-requests
 - fazer cybervox.TTS retornar erros ao invés de imprimi-los
 
