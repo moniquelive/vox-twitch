@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <title>Vox @ Twitch.tv</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta2/dist/css/bootstrap.min.css"
+        rel="stylesheet"
+        integrity="sha384-BmbxuPwQa2lc/FVzBcNJ7UAyJxM6wuqIj61tLrc4wSX0szH/Ev+nYRRuWlolflfl"
+        crossorigin="anonymous">
+  <style>
+      a[draggable=true] {
+          cursor: move;
+      }
+
+      .svg-inline--fa.fa-w-18,
+      .svg-inline--fa.fa-w-16,
+      .svg-inline--fa.fa-w-20 {
+          width: 1em;
+      }
+  </style>
+</head>
+
+<body>
+<div class="container-fluid">
+  <nav class="navbar navbar-light bg-light">
+    <div class="container">
+      <a class="navbar-brand" href="#">
+        <img src="https://i2.wp.com/cybervox.ai/wp-content/uploads/sites/11/LOGO_cybervox_preto.png" alt="" height="24">
+      </a>
+      <a href="/logout">Logout</a>
+    </div>
+  </nav>
+  <section>
+    <div class="card border-secondary bg-light mt-3">
+      <div class="card-body"><p><strong>Pronto! Agora é só arrastar este botão em cima da janela do OBS:</strong>
+        <a href="/layer/{{.UserID}}/?layer-name=VoxAtTwitch&layer-width=800&layer-height=600"
+           draggable="true" class=" btn btn-primary btn-block browser_drag_item browser_drag_item">
+          Me arraste em cima do OBS!
+        </a>
+      </div>
+    </div>
+  </section>
+</div>
+</body>
+</html>

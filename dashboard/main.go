@@ -50,8 +50,11 @@ var voxClientID string
 //go:embed .vox_client_secret
 var voxClientSecret string
 
-//go:embed index.html
-var indexHtml string
+//go:embed logged-out.html
+var loggedOutHTML []byte
+
+//go:embed logged-in.html
+var loggedInHTML string
 
 //go:embed layer.html
 var layerHtml string
@@ -94,8 +97,7 @@ func HandleRoot(w http.ResponseWriter, r *http.Request) {
 	if oauthToken == nil {
 		w.WriteHeader(http.StatusOK)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, err = w.Write(
-			[]byte(`<html><body><a href="/login">Login using Twitch</a></body></html>`))
+		_, err = w.Write(loggedOutHTML)
 		return
 	}
 	var ok bool
@@ -139,7 +141,7 @@ func HandleRoot(w http.ResponseWriter, r *http.Request) {
 	log.Println("HandleRoot > channel:", user.Data.Users[0].ID)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	tmpl, err := template.New("index").Parse(indexHtml)
+	tmpl, err := template.New("index").Parse(loggedInHTML)
 	if err != nil {
 		log.Printf("HandleRoot > error creating template: %v", err)
 		return

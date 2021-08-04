@@ -91,9 +91,11 @@ func (c *Client) writePump() {
 		select {
 		case message, ok := <-c.send:
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			c.cybervoxWS.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
 				// The hub closed the channel.
 				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+				c.cybervoxWS.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
 
@@ -103,19 +105,16 @@ func (c *Client) writePump() {
 			}
 			w.Write(message)
 
-			//// Add queued chat messages to the current websocket message.
-			//n := len(c.send)
-			//for i := 0; i < n; i++ {
-			//	w.Write(newline)
-			//	w.Write(<-c.send)
-			//}
-
 			if err := w.Close(); err != nil {
 				return
 			}
 		case <-ticker.C:
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				return
+			}
+			c.cybervoxWS.SetWriteDeadline(time.Now().Add(writeWait))
+			if err := c.cybervoxWS.WriteMessage(websocket.PingMessage, nil); err != nil {
 				return
 			}
 		}
