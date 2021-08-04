@@ -66,7 +66,7 @@ const (
 
 var (
 	scopes       = []string{"user:read:email"}
-	redirectURL  = "http://localhost:7001/redirect"
+	redirectURL  = "https://vox-twitch.monique.dev/redirect" //"http://localhost:7001/redirect"
 	cookieSecret = []byte("my awesome cookie secret <3 monique.dev")
 	cookieStore  = sessions.NewCookieStore(cookieSecret)
 )
