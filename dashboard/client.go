@@ -91,11 +91,9 @@ func (c *Client) writePump() {
 		select {
 		case message, ok := <-c.send:
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
-			c.cybervoxWS.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
 				// The hub closed the channel.
 				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
-				c.cybervoxWS.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
 

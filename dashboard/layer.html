@@ -10,7 +10,7 @@
 <script>
     let openedSocket = false
     const serverURL = document.location.origin.replace('http', 'ws')
-    const wsPath = '/ws/'
+    const wsPath = '/ws/{{ .UserID }}'
     const ws = new WebSocket(serverURL+wsPath)
 
     function connect() {

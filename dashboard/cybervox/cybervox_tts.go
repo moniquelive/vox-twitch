@@ -43,6 +43,7 @@ func TTS(ws *websocket.Conn, text, voice string) (response TTSResponse) {
 			Timestamp: time.Now().UnixNano(),
 		},
 	}
+	ws.SetWriteDeadline(time.Now().Add(10 * time.Second))
 	if err := ws.WriteJSON(request); err != nil {
 		log.Println(err)
 		return
