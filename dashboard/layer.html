@@ -11,11 +11,11 @@
     let openedSocket = false
     const serverURL = document.location.origin.replace('http', 'ws')
     const wsPath = '/ws/{{ .UserID }}'
-    const ws = new WebSocket(serverURL+wsPath)
 
     function connect() {
         if (openedSocket) return
 
+        const ws = new WebSocket(serverURL+wsPath)
         return new Promise((resolve, reject) => {
             ws.onopen = () => {
                 openedSocket = true
