@@ -47,10 +47,14 @@ $(() => {
         //console.log('Submitting a question');
         const text = $("#text").val()
 
+        let url = 'https://vox-twitch.monique.dev/tts/'
+        if (document.location.hostname === 'localhost') {
+            url = location.protocol + '//localhost:7001/tts/'
+        }
         //ajax call
         $.ajax({
             type: 'POST',
-            url: location.protocol + '//localhost:7001/tts/',
+            url: url,
             data: {text: text},
             headers: {"Authorization": 'Bearer ' + token},
         });
