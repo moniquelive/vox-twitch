@@ -40,12 +40,14 @@ twitch.configuration.onChanged(() => {
 
 $(() => {
     $("#form").submit((e) => {
+        e.preventDefault();
         //console.log('in function')
         if (!token) {
             return //console.log('Not authorized');
         }
         //console.log('Submitting a question');
-        const text = $("#text").val()
+        const $text = $("#text")
+        const text = $text.val()
 
         let url = 'https://vox-twitch.monique.dev/tts/'
         if (document.location.hostname === 'localhost') {
@@ -57,6 +59,9 @@ $(() => {
             url: url,
             data: {text: text},
             headers: {"Authorization": 'Bearer ' + token},
+            complete: () => {
+                $text.val('')
+            },
         });
     })
 });
