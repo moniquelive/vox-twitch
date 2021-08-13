@@ -45,6 +45,9 @@ $(() => {
         if (!token) {
             return //console.log('Not authorized');
         }
+        if (!twitch.viewer.isLinked) {
+            twitch.actions.requestIdShare()
+        }
         //console.log('Submitting a question');
         const $text = $("#text")
         const text = $text.val()
