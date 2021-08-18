@@ -325,7 +325,7 @@ func HandleWebsocket(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		hub:        hub,
 		conn:       conn,
 		cybervoxWS: cybervoxWS,
-		send:       make(chan []byte, 256),
+		send:       make(chan *Message, 256),
 	}
 	client.hub.register <- client
 
@@ -375,24 +375,48 @@ func HandleTTS(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	//	w.WriteHeader(http.StatusInternalServerError)
 	//	return
 	//}
+	channelID := ""
 	userID := ""
 	if claims, ok := token.Claims.(jwt.MapClaims); ok { //&& token.Valid {
-		userID = claims["channel_id"].(string)
+		channelID = claims["channel_id"].(string)
+		userID = claims["user_id"].(string)
 	} else {
 		fmt.Println(err)
 	}
 
 	// verifica se canal está on
-	if _, found := hub.clients[userID]; !found {
-		log.Println("HandleTTS > hub.clients not found:", userID)
+	if _, found := hub.clients[channelID]; !found {
+		log.Println("HandleTTS > hub.clients not found:", channelID)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
+	}
+
+	client, err := helix.NewClient(&helix.Options{
+		ClientID:       clientID,
+		ClientSecret:   clientSecret,
+	})
+	if err != nil {
+		log.Println("HandleRoot > NewClient:", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	accessToken, err := client.RequestAppAccessToken(nil)
+	if err != nil {
+		return
+	}
+	client.SetAppAccessToken(accessToken.Data.AccessToken)
+
+	userName := ""
+	users, err := client.GetUsers(&helix.UsersParams{IDs: []string{userID}})
+	if err == nil {
+		userName = users.Data.Users[0].DisplayName
 	}
 
 	// vai na cybervox gerar o audio...
 	text := r.FormValue("text")
 	var url string
-	if c, ok := hub.clients[userID]; ok {
+	if c, ok := hub.clients[channelID]; ok {
 		var err error
 		if url, err = c.TTS(text); err != nil {
 			log.Println("HandleTTS > error calling cybervox:", err)
@@ -402,8 +426,10 @@ func HandleTTS(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	}
 	// manda url do audio para o websocket do canal
 	hub.broadcast <- &Message{
-		clientID: userID,
-		message:  []byte(url),
+		ClientID: channelID,
+		AudioURL: url,
+		Text:     text,
+		UserName: userName,
 	}
 }
 

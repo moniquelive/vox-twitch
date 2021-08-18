@@ -15,7 +15,7 @@
     function connect() {
         if (openedSocket) return
 
-        const ws = new WebSocket(serverURL+wsPath)
+        const ws = new WebSocket(serverURL + wsPath)
         return new Promise((resolve, reject) => {
             ws.onopen = () => {
                 openedSocket = true
@@ -32,9 +32,14 @@
 
             ws.onmessage = (e) => {
                 if (typeof e.data == "string") {
+                    // client_id
+                    // audio_url
+                    // text
+                    // username
+                    const j = JSON.parse(e.data)
                     try {
                         // TODO: enfileirar mensagens recebidas ao inves de processar na hora
-                        (new Audio(e.data)).play()
+                        (new Audio(j["audio_url"])).play()
                     } catch (ex) {
                         // console.log("ex:", ex)
                     }
@@ -50,6 +55,7 @@
         } catch (err) {
         }
     }
+
     reconnect();
     setInterval(reconnect, 5000);
 </script>
