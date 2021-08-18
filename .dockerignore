@@ -1,5 +1,10 @@
 .idea
+**/Dockerfile
+docker-compose.yml
+
 .oauth_client*
 .vox_client*
 **/node_modules
 *.sh
+**/elm-stuff
+*.min.js

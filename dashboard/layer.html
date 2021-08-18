@@ -4,18 +4,43 @@
 <head>
   <meta charset="utf-8">
   <title>Vox @ Twitch.tv</title>
+  <script src="/elm.min.js"></script>
+  <style>
+      marquee {
+          background-color: rgba(0, 0, 0, 0.3);
+          color: #eee;
+          font-size: 48px;
+          position: absolute;
+          width: 25%;
+          height: 100%;
+          right: 10px;
+          text-shadow: 2px 2px #000;
+      }
+  </style>
 </head>
 
 <body>
+<div id="app"></div>
+</body>
+
 <script>
     let openedSocket = false
     const serverURL = document.location.origin.replace('http', 'ws')
     const wsPath = '/ws/{{ .UserID }}'
 
+    const app = Elm.Main.init({
+        node: document.getElementById('app')
+    })
+    app.ports.playUrl.subscribe(function (url) {
+        (new Audio(url)).play()
+    })
+
     function connect() {
         if (openedSocket) return
 
         const ws = new WebSocket(serverURL + wsPath)
+        ws.addEventListener("message", (event) => app.ports.messageReceiver.send(event.data))
+
         return new Promise((resolve, reject) => {
             ws.onopen = () => {
                 openedSocket = true
@@ -29,23 +54,6 @@
                 openedSocket = false
                 reject(err)
             }
-
-            ws.onmessage = (e) => {
-                if (typeof e.data == "string") {
-                    // client_id
-                    // audio_url
-                    // text
-                    // username
-                    const j = JSON.parse(e.data)
-                    try {
-                        // TODO: enfileirar mensagens recebidas ao inves de processar na hora
-                        (new Audio(j["audio_url"])).play()
-                    } catch (ex) {
-                        // console.log("ex:", ex)
-                    }
-                }
-            }
-
         })
     }
 
@@ -53,12 +61,12 @@
         try {
             await connect()
         } catch (err) {
+            console.log(err)
         }
     }
 
     reconnect();
     setInterval(reconnect, 5000);
 </script>
-</body>
 
 </html>

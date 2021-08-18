@@ -59,6 +59,9 @@ var loggedInHTML string
 //go:embed layer.html
 var layerHtml string
 
+//go:embed elm/elm.min.js
+var elmMinJs []byte
+
 const (
 	oauthSessionName = "oauth-session"
 	oauthTokenKey    = "oauth-token"
@@ -392,8 +395,8 @@ func HandleTTS(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	}
 
 	client, err := helix.NewClient(&helix.Options{
-		ClientID:       clientID,
-		ClientSecret:   clientSecret,
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
 	})
 	if err != nil {
 		log.Println("HandleRoot > NewClient:", err)
@@ -451,6 +454,12 @@ func main() {
 	})
 	mux.HandleFunc("/tts/", func(w http.ResponseWriter, r *http.Request) {
 		HandleTTS(hub, w, r)
+	})
+	mux.HandleFunc("/elm.min.js", func(w http.ResponseWriter, r *http.Request) {
+		if _, err := w.Write(elmMinJs); err != nil {
+			log.Println("main > elm.min.js:", err)
+			return
+		}
 	})
 	mux.HandleFunc("/", HandleRoot)
 
