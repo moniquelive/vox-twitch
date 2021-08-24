@@ -6,10 +6,33 @@
   <title>Vox @ Twitch.tv</title>
   <script src="/elm.min.js"></script>
   <style>
-      marquee {
+      .content {
+          display: flex;
+          flex-direction: row;
+      }
+
+      .container {
+          flex-direction: column;
+          justify-content: center;
+
+          margin-left: 16px;
+      }
+
+      .username {
+          font-weight: bold;
+      }
+
+      .user-picture img {
+          width: 64px;
+          height: 64px;
+      }
+
+      .main {
+          display: flex;
+          flex-direction: column;
           background-color: rgba(0, 0, 0, 0.3);
           color: #eee;
-          font-size: 48px;
+          font-size: 32px;
           position: absolute;
           width: 25%;
           height: 100%;

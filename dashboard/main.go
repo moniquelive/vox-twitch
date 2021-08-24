@@ -410,10 +410,11 @@ func HandleTTS(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	}
 	client.SetAppAccessToken(accessToken.Data.AccessToken)
 
-	userName := ""
+	var userName, userPicture string
 	users, err := client.GetUsers(&helix.UsersParams{IDs: []string{userID}})
 	if err == nil {
 		userName = users.Data.Users[0].DisplayName
+		userPicture = users.Data.Users[0].ProfileImageURL
 	}
 
 	// vai na cybervox gerar o audio...
@@ -429,10 +430,11 @@ func HandleTTS(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	}
 	// manda url do audio para o websocket do canal
 	hub.broadcast <- &Message{
-		ClientID: channelID,
-		AudioURL: url,
-		Text:     text,
-		UserName: userName,
+		ClientID:    channelID,
+		AudioURL:    url,
+		Text:        text,
+		UserName:    userName,
+		UserPicture: userPicture,
 	}
 }
 

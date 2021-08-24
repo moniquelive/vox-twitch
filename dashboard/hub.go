@@ -9,10 +9,11 @@ import (
 )
 
 type Message struct {
-	ClientID string `json:"client_id"`
-	AudioURL string `json:"audio_url"`
-	Text     string `json:"text"`
-	UserName string `json:"username"`
+	ClientID    string `json:"client_id"`
+	AudioURL    string `json:"audio_url"`
+	Text        string `json:"text"`
+	UserName    string `json:"username"`
+	UserPicture string `json:"user_picture"`
 }
 
 // Hub maintains the set of active clients and broadcasts messages to the

@@ -41,12 +41,14 @@ type alias WebsocketMessage =
     , audio_url : String
     , text : String
     , username : String
+    , user_picture : String
     }
 
 
 type alias Card =
     { username : String
     , text : String
+    , user_picture : String
     }
 
 
@@ -80,7 +82,7 @@ update msg model =
         Recv json ->
             case D.decodeString websocketMessageDecoder json of
                 Ok ws ->
-                    ( { model | cards = model.cards ++ [ Card ws.username ws.text ] }
+                    ( { model | cards = model.cards ++ [ Card ws.username ws.text ws.user_picture ] }
                     , playUrl ws.audio_url
                     )
 
@@ -96,7 +98,7 @@ subscriptions : Model -> Sub Msg
 subscriptions _ =
     Sub.batch
         [ messageReceiver Recv
-        , Time.every (60 * 1000) Tick
+        , Time.every (30 * 1000) Tick
         ]
 
 
@@ -106,19 +108,18 @@ subscriptions _ =
 
 cardView : Card -> Html Msg
 cardView card =
-    div []
-        [ h3 [ class "username" ] [ text card.username ]
-        , p [ class "text" ] [ text card.text ]
+    div [ class "content" ]
+        [ div [ class "user-picture" ] [ img [ src card.user_picture ] [] ]
+        , div [ class "container" ]
+            [ div [ class "username" ] [ text card.username ]
+            , div [ class "text" ] [ text card.text ]
+            ]
         ]
 
 
 view : Model -> Html Msg
 view model =
-    node "marquee"
-        [ attribute "scrolldelay" "60"
-        , attribute "direction" "up"
-        ]
-        (List.map cardView model.cards)
+    div [ class "main" ] (List.map cardView model.cards)
 
 
 
@@ -127,8 +128,9 @@ view model =
 
 websocketMessageDecoder : D.Decoder WebsocketMessage
 websocketMessageDecoder =
-    D.map4 WebsocketMessage
+    D.map5 WebsocketMessage
         (D.field "client_id" D.string)
         (D.field "audio_url" D.string)
         (D.field "text" D.string)
         (D.field "username" D.string)
+        (D.field "user_picture" D.string)
