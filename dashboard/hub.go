@@ -5,6 +5,8 @@
 package main
 
 import (
+	"log"
+
 	"github.com/gorilla/websocket"
 )
 
@@ -46,12 +48,14 @@ func (h *Hub) run() {
 		select {
 		case client := <-h.register:
 			h.clients[client.id] = client
+			h.printStatus()
 		case client := <-h.unregister:
 			if c, ok := h.clients[client.id]; ok {
 				c.cybervoxWS.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 				c.cybervoxWS.Close()
 				delete(h.clients, client.id)
 				close(client.send)
+				h.printStatus()
 			}
 		case message := <-h.broadcast:
 			client := h.clients[message.ClientID]
@@ -63,4 +67,12 @@ func (h *Hub) run() {
 			}
 		}
 	}
+}
+
+func (h *Hub) printStatus() {
+	clients := ""
+	for c := range h.clients {
+		clients += c + "\n"
+	}
+	log.Println("canais\n------------\n", clients)
 }
