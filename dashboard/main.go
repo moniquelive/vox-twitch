@@ -68,8 +68,12 @@ const (
 )
 
 var (
-	scopes       = []string{"user:read:email"}
-	redirectURL  = "https://vox-twitch.monique.dev/redirect" //"http://localhost:7001/redirect"
+	scopes = []string{"user:read:email"}
+	/**
+	redirectURL = "http://localhost:7001/redirect"
+	/*/
+	redirectURL  = "https://vox-twitch.monique.dev/redirect"
+	/**/
 	cookieSecret = []byte("my awesome cookie secret <3 monique.dev")
 	cookieStore  = sessions.NewCookieStore(cookieSecret)
 )
@@ -142,6 +146,13 @@ func HandleRoot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Println("HandleRoot > channel:", user.Data.Users[0].ID)
+	////const botID = "661856691"
+	////const profID = "551257512"
+	////const punkID = "533882077"
+	//information, err := client.GetStreams(&helix.StreamsParams{
+	//	UserIDs: []string{user.Data.Users[0].ID},
+	//})
+	//fmt.Println("len:", len(information.Data.Streams)) // len == 1 ? LIVE : OFFLINE
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	tmpl, err := template.New("index").Parse(loggedInHTML)
