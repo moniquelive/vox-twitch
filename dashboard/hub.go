@@ -72,7 +72,7 @@ func (h *Hub) run() {
 func (h *Hub) printStatus() {
 	clients := ""
 	for c := range h.clients {
-		clients += c + "\n"
+		clients += "\n" + c
 	}
-	log.Println("canais\n------------\n", clients)
+	log.Println("canais\n------------", clients)
 }
