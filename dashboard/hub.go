@@ -9,8 +9,11 @@ import (
 )
 
 type Message struct {
-	clientID string
-	message []byte
+	ClientID    string `json:"client_id"`
+	AudioURL    string `json:"audio_url"`
+	Text        string `json:"text"`
+	UserName    string `json:"username"`
+	UserPicture string `json:"user_picture"`
 }
 
 // Hub maintains the set of active clients and broadcasts messages to the
@@ -51,9 +54,9 @@ func (h *Hub) run() {
 				close(client.send)
 			}
 		case message := <-h.broadcast:
-			client := h.clients[message.clientID]
+			client := h.clients[message.ClientID]
 			select {
-			case client.send <- message.message:
+			case client.send <- message:
 			default:
 				close(client.send)
 				delete(h.clients, client.id)

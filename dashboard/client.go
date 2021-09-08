@@ -43,7 +43,7 @@ type Client struct {
 	conn *websocket.Conn
 
 	// Buffered channel of outbound messages.
-	send chan []byte
+	send chan *Message
 
 	// CyberVox API websocket
 	cybervoxWS *websocket.Conn
@@ -97,15 +97,10 @@ func (c *Client) writePump() {
 				return
 			}
 
-			w, err := c.conn.NextWriter(websocket.TextMessage)
-			if err != nil {
+			if err := c.conn.WriteJSON(message); err != nil {
 				return
 			}
-			w.Write(message)
 
-			if err := w.Close(); err != nil {
-				return
-			}
 		case <-ticker.C:
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
