@@ -72,7 +72,7 @@ var (
 	/**
 	redirectURL = "http://localhost:7001/redirect"
 	/*/
-	redirectURL  = "https://vox-twitch.monique.dev/redirect"
+	redirectURL = "https://vox-twitch.monique.dev/redirect"
 	/**/
 	cookieSecret = []byte("my awesome cookie secret <3 monique.dev")
 	cookieStore  = sessions.NewCookieStore(cookieSecret)
@@ -370,7 +370,10 @@ func HandleTTS(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	authHeader := ""
 	tokenString := ""
 	if authHeader = r.Header.Get("Authorization"); authHeader != "" {
-		tokenString = strings.Split(authHeader, " ")[1]
+		split := strings.Split(authHeader, " ")
+		if len(split) > 2 {
+			tokenString = split[1]
+		}
 	}
 	if tokenString == "" {
 		log.Println("HandleTTS > empty TokenString:", authHeader)
