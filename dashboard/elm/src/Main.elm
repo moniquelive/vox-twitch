@@ -1,11 +1,13 @@
 port module Main exposing (..)
 
 import Browser
+import Dict exposing (Dict)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Json.Decode as D
-import Time
+import Process
+import Task
 
 
 
@@ -53,13 +55,14 @@ type alias Card =
 
 
 type alias Model =
-    { cards : List Card
+    { cards : Dict Int Card
+    , card_id : Int
     }
 
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( { cards = [] }, Cmd.none )
+    ( Model Dict.empty 0, Cmd.none )
 
 
 
@@ -68,22 +71,34 @@ init _ =
 
 type Msg
     = Recv String
-    | Tick Time.Posix
+    | Remove Int
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        Tick _ ->
-            ( { model | cards = List.tail model.cards |> Maybe.withDefault [] }
-            , Cmd.none
-            )
+        Remove id ->
+            let
+                new_dict =
+                    Dict.remove id model.cards
+            in
+            ( { model | cards = new_dict }, Cmd.none )
 
         Recv json ->
             case D.decodeString websocketMessageDecoder json of
                 Ok ws ->
-                    ( { model | cards = model.cards ++ [ Card ws.username ws.text ws.user_picture ] }
-                    , playUrl ws.audio_url
+                    let
+                        next_id =
+                            model.card_id + 1
+
+                        new_dict =
+                            Dict.insert next_id (Card ws.username ws.text ws.user_picture) model.cards
+                    in
+                    ( { model | card_id = next_id, cards = new_dict }
+                    , Cmd.batch
+                        [ playUrl ws.audio_url
+                        , Process.sleep 15000 |> Task.perform (always (Remove next_id))
+                        ]
                     )
 
                 Err _ ->
@@ -96,10 +111,7 @@ update msg model =
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-    Sub.batch
-        [ messageReceiver Recv
-        , Time.every (30 * 1000) Tick
-        ]
+    messageReceiver Recv
 
 
 
@@ -119,7 +131,11 @@ cardView card =
 
 view : Model -> Html Msg
 view model =
-    div [ class "main" ] (List.map cardView model.cards)
+    let
+        card_list =
+            Dict.values model.cards
+    in
+    div [ class "main" ] (List.map cardView card_list)
 
 
 

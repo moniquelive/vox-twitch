@@ -371,7 +371,7 @@ func HandleTTS(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	tokenString := ""
 	if authHeader = r.Header.Get("Authorization"); authHeader != "" {
 		split := strings.Split(authHeader, " ")
-		if len(split) > 2 {
+		if len(split) == 2 {
 			tokenString = split[1]
 		}
 	}
