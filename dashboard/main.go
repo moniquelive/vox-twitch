@@ -88,7 +88,7 @@ var upgrader = websocket.Upgrader{
 
 // HandleRoot is a Handler that shows a login button. In production, if the frontend is served / generated
 // by Go, it should use html/template to prevent XSS attacks.
-func HandleRoot(w http.ResponseWriter, r *http.Request) {
+func HandleRoot(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	log.Println("URL:", r.URL)
 	if r.URL.Path != "/" {
 		w.WriteHeader(http.StatusNotFound)
@@ -163,8 +163,10 @@ func HandleRoot(w http.ResponseWriter, r *http.Request) {
 	parsed := bytes.NewBufferString("")
 	vars := struct {
 		UserID string
+		Online []TwitchUser
 	}{
 		UserID: user.Data.Users[0].ID,
+		Online: hub.Online(clientID),
 	}
 	err = tmpl.Execute(parsed, vars)
 	if err != nil {
@@ -477,7 +479,9 @@ func main() {
 			return
 		}
 	})
-	mux.HandleFunc("/", HandleRoot)
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		HandleRoot(hub, w, r)
+	})
 
 	fmt.Println("Started running on http://localhost:7001")
 	fmt.Println(http.ListenAndServe(":7001", nil))

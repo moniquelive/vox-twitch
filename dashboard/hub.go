@@ -8,6 +8,7 @@ import (
 	"log"
 
 	"github.com/gorilla/websocket"
+	"github.com/parnurzeal/gorequest"
 )
 
 type Message struct {
@@ -75,4 +76,33 @@ func (h *Hub) printStatus() {
 		clients += "\n" + c
 	}
 	log.Println("canais\n------------", clients)
+}
+
+type TwitchUser struct {
+	//Id          string    `json:"_id"`
+	//Type        string    `json:"type"`
+	//Bio         string    `json:"bio"`
+	//CreatedAt   time.Time `json:"created_at"`
+	//UpdatedAt   time.Time `json:"updated_at"`
+	DisplayName string `json:"display_name"`
+	Name        string `json:"name"`
+	Logo        string `json:"logo"`
+}
+
+func (h *Hub) Online(clientID string) (online []TwitchUser) {
+	var twitchUserResponse TwitchUser
+
+	for c := range h.clients {
+		// TODO: fazer um cache dessas infos no hub
+		_, _, errs := gorequest.New().
+			Get("https://api.twitch.tv/kraken/users/"+c).
+			AppendHeader("Client-ID", clientID).
+			AppendHeader("Accept", "application/vnd.twitchtv.v5+json").
+			EndStruct(&twitchUserResponse)
+		if errs != nil {
+			continue
+		}
+		online = append(online, twitchUserResponse)
+	}
+	return
 }
