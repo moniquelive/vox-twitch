@@ -177,7 +177,7 @@ view model =
                     [ text "Compartilhe: " ]
                 ]
             , div [ class "form-group" ]
-                [ a [ class "btn btn-color", href "https://twitch.tv", target "_blank" ]
+                [ a [ class "btn btn-color", href "https://twitch.tv/moniquelive", target "_blank" ]
                     [ i [ class "fab fa-twitch" ]
                         []
                     ]
