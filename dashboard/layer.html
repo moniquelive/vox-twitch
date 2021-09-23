@@ -9,6 +9,7 @@
       .content {
           display: flex;
           flex-direction: row;
+          position: relative;
       }
 
       .container {
@@ -43,9 +44,10 @@
           font-size: 32px;
           position: absolute;
           width: 25%;
-          height: 100%;
           right: 10px;
           text-shadow: 2px 2px #000;
+          overflow: hidden;
+          height: 90vh;
       }
   </style>
 </head>
@@ -60,7 +62,8 @@
     const wsPath = '/ws/{{ .UserID }}'
 
     const app = Elm.Main.init({
-        node: document.getElementById('app')
+        node: document.getElementById('app'),
+        flags: window.innerHeight
     })
     app.ports.playUrl.subscribe(function (url) {
         (new Audio(url)).play()
