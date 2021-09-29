@@ -66,7 +66,9 @@
         flags: window.innerHeight
     })
     app.ports.playUrl.subscribe(function (url) {
-        (new Audio(url)).play()
+        const audio = new Audio(url)
+        audio.onended = () => app.ports.audioEnded.send(null);
+        audio.play()
     })
 
     function connect() {

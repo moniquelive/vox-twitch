@@ -5,7 +5,6 @@ import Animation.Messenger
 import Browser
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Html.Events exposing (..)
 import Json.Decode as D
 import Time
 
@@ -34,6 +33,9 @@ port playUrl : String -> Cmd msg
 port messageReceiver : (String -> msg) -> Sub msg
 
 
+port audioEnded : (() -> msg) -> Sub msg
+
+
 
 -- MODEL
 
@@ -57,13 +59,14 @@ type alias Card =
 
 type alias Model =
     { cards : List Card
+    , audios : List String
     , innerHeight : Float
     }
 
 
 init : Float -> ( Model, Cmd Msg )
 init innerHeight =
-    ( Model [] innerHeight, Cmd.none )
+    ( Model [] [] innerHeight, Cmd.none )
 
 
 
@@ -71,9 +74,10 @@ init innerHeight =
 
 
 type Msg
-    = Recv String
+    = WebsocketMessageReceived String
     | Animate Animation.Msg
-    | Finished
+    | AnimationDone
+    | AudioEnded
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -97,7 +101,7 @@ update msg model =
             , Cmd.batch cmds
             )
 
-        Recv json ->
+        WebsocketMessageReceived json ->
             case D.decodeString websocketMessageDecoder json of
                 Ok ws ->
                     let
@@ -106,22 +110,54 @@ update msg model =
                                 [ Animation.to [ Animation.translate (percent 0) (px 0) ]
                                 , Animation.wait (Time.millisToPosix <| 15 * 1000)
                                 , Animation.to [ Animation.translate (percent 115) (percent 0) ]
-                                , Animation.Messenger.send Finished
+                                , Animation.Messenger.send AnimationDone
                                 ]
                                 (Animation.style [ Animation.translate (percent 0) (px model.innerHeight) ])
 
                         newCard =
-                            Card ws.username ws.text ws.user_picture newAnimation
+                            [ Card ws.username ws.text ws.user_picture newAnimation ]
+
+                        newAudio =
+                            if String.isEmpty ws.audio_url then
+                                []
+
+                            else
+                                [ ws.audio_url ]
+
+                        cmd =
+                            if List.isEmpty model.audios then
+                                playUrl ws.audio_url
+
+                            else
+                                Cmd.none
                     in
-                    ( { model | cards = model.cards ++ [ newCard ] }
-                    , playUrl ws.audio_url
+                    ( { model
+                        | cards = model.cards ++ newCard
+                        , audios = model.audios ++ newAudio
+                      }
+                    , cmd
                     )
 
                 Err _ ->
                     ( model, Cmd.none )
 
-        Finished ->
+        AnimationDone ->
             ( { model | cards = List.drop 1 model.cards }, Cmd.none )
+
+        AudioEnded ->
+            let
+                newAudios =
+                    List.drop 1 model.audios
+
+                cmd =
+                    case List.head newAudios of
+                        Just url ->
+                            playUrl url
+
+                        Nothing ->
+                            Cmd.none
+            in
+            ( { model | audios = newAudios }, cmd )
 
 
 
@@ -131,7 +167,8 @@ update msg model =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ messageReceiver Recv
+        [ messageReceiver WebsocketMessageReceived
+        , audioEnded (always AudioEnded)
         , Animation.subscription Animate <| List.map .animStyle model.cards
         ]
 
