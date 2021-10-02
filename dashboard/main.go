@@ -17,6 +17,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/moniquelive/vox-twitch/dashboard/cybervox"
 	"github.com/nicklaw5/helix"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // soundalerts.com pede:
@@ -482,6 +483,7 @@ func main() {
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		HandleRoot(hub, w, r)
 	})
+	mux.Handle("/metrics", promhttp.Handler())
 
 	fmt.Println("Started running on http://localhost:7001")
 	fmt.Println(http.ListenAndServe(":7001", nil))
