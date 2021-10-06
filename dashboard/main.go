@@ -17,6 +17,8 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/moniquelive/vox-twitch/dashboard/cybervox"
 	"github.com/nicklaw5/helix"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -86,6 +88,18 @@ var upgrader = websocket.Upgrader{
 		return true
 	},
 }
+
+var (
+	usersConnected = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "vox_twitch_connected_users_total",
+		Help: "The total number of connected users",
+	})
+	ttsGenerated = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "vox_twitch_generated_tts_total",
+		Help: "The total number of tts messages spoken",
+	}, []string{"channel_id"},
+	)
+)
 
 // HandleRoot is a Handler that shows a login button. In production, if the frontend is served / generated
 // by Go, it should use html/template to prevent XSS attacks.

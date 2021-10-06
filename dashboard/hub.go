@@ -9,6 +9,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/parnurzeal/gorequest"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 type Message struct {
@@ -46,6 +47,7 @@ func newHub() *Hub {
 
 func (h *Hub) run() {
 	for {
+		usersConnected.Set(float64(len(h.clients)))
 		select {
 		case client := <-h.register:
 			h.clients[client.id] = client
@@ -62,6 +64,7 @@ func (h *Hub) run() {
 			client := h.clients[message.ClientID]
 			select {
 			case client.send <- message:
+				ttsGenerated.With(prometheus.Labels{"channel_id": client.id}).Inc()
 			default:
 				close(client.send)
 				delete(h.clients, client.id)
