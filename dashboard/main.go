@@ -40,30 +40,30 @@ import (
 //		?layer-name=SoundAlerts
 //		&layer-width=800
 //		&layer-height=600
+var (
+	//go:embed .oauth_client_id
+	clientID string
+	//go:embed .oauth_client_secret
+	clientSecret string
+)
 
-//go:embed .oauth_client_id
-var clientID string
+var (
+	//go:embed .vox_client_id
+	voxClientID string
+	//go:embed .vox_client_secret
+	voxClientSecret string
+)
 
-//go:embed .oauth_client_secret
-var clientSecret string
-
-//go:embed .vox_client_id
-var voxClientID string
-
-//go:embed .vox_client_secret
-var voxClientSecret string
-
-//go:embed logged-out.html
-var loggedOutHTML []byte
-
-//go:embed logged-in.html
-var loggedInHTML string
-
-//go:embed layer.html
-var layerHtml string
-
-//go:embed elm/elm.min.js
-var elmMinJs []byte
+var (
+	//go:embed logged-out.html
+	loggedOutHTML []byte
+	//go:embed logged-in.html
+	loggedInHTML string
+	//go:embed layer.html
+	layerHtml string
+	//go:embed elm/elm.min.js
+	elmMinJs []byte
+)
 
 const (
 	oauthSessionName = "oauth-session"
@@ -272,6 +272,8 @@ func HandleOAuth2Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// TODO: verificar se FormValue("state") é valido!
+
 	code := r.FormValue("code")
 
 	token, err := client.RequestUserAccessToken(code)
@@ -478,9 +480,11 @@ func main() {
 	go hub.run()
 
 	mux := http.DefaultServeMux
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 	mux.HandleFunc("/login", HandleLogin)
-	mux.HandleFunc("/logout", HandleLogout)
 	mux.HandleFunc("/redirect", HandleOAuth2Callback)
+
+	mux.HandleFunc("/logout", HandleLogout)
 	mux.HandleFunc("/layer/", HandleLayer)
 	mux.HandleFunc("/ws/", func(w http.ResponseWriter, r *http.Request) {
 		HandleWebsocket(hub, w, r)
@@ -494,7 +498,6 @@ func main() {
 			return
 		}
 	})
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		HandleRoot(hub, w, r)
 	})
 	mux.Handle("/metrics", promhttp.Handler())
