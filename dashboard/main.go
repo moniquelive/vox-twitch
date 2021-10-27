@@ -481,6 +481,8 @@ func main() {
 
 	mux := http.DefaultServeMux
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		HandleRoot(hub, w, r)
+	})
 	mux.HandleFunc("/login", HandleLogin)
 	mux.HandleFunc("/redirect", HandleOAuth2Callback)
 
@@ -497,8 +499,6 @@ func main() {
 			log.Println("main > elm.min.js:", err)
 			return
 		}
-	})
-		HandleRoot(hub, w, r)
 	})
 	mux.Handle("/metrics", promhttp.Handler())
 
