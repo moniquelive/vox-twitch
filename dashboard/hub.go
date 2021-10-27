@@ -8,7 +8,7 @@ import (
 	"log"
 
 	"github.com/gorilla/websocket"
-	"github.com/parnurzeal/gorequest"
+	"github.com/nicklaw5/helix"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -92,20 +92,21 @@ type TwitchUser struct {
 	Logo        string `json:"logo"`
 }
 
-func (h *Hub) Online(clientID string) (online []TwitchUser) {
-	var twitchUserResponse TwitchUser
-
+func (h *Hub) Online(client *helix.Client) (online []TwitchUser) {
+	ids := make([]string, 0, len(h.clients))
 	for c := range h.clients {
-		// TODO: fazer um cache dessas infos no hub
-		_, _, errs := gorequest.New().
-			Get("https://api.twitch.tv/kraken/users/"+c).
-			AppendHeader("Client-ID", clientID).
-			AppendHeader("Accept", "application/vnd.twitchtv.v5+json").
-			EndStruct(&twitchUserResponse)
-		if errs != nil {
-			continue
-		}
-		online = append(online, twitchUserResponse)
+		ids = append(ids, c)
+	}
+	resp, err := client.GetUsers(&helix.UsersParams{IDs: ids})
+	if err != nil {
+		return
+	}
+	for _, user := range resp.Data.Users {
+		online = append(online, TwitchUser{
+			DisplayName: user.DisplayName,
+			Name:        user.Login,
+			Logo:        user.ProfileImageURL,
+		})
 	}
 	return
 }

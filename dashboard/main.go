@@ -181,7 +181,7 @@ func HandleRoot(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		Online []TwitchUser
 	}{
 		UserID: user.Data.Users[0].ID,
-		Online: hub.Online(clientID),
+		Online: hub.Online(client),
 	}
 	err = tmpl.Execute(parsed, vars)
 	if err != nil {
