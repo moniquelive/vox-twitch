@@ -142,8 +142,15 @@ func HandleRoot(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	validateToken, _, _ := client.ValidateToken(token.AccessToken)
 	if !validateToken {
 		if token, err = refreshToken(w, r, client, token.RefreshToken); err != nil {
+			// log error
 			log.Println("HandleRoot > refreshToken:", err)
-			w.WriteHeader(http.StatusInternalServerError)
+			// clear cookies
+			session.Options.MaxAge = -1
+			if err = session.Save(r, w); err != nil {
+				log.Println("session.Save:", err)
+			}
+			// return to home page
+			http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
 			return
 		}
 	}
