@@ -163,8 +163,15 @@ func HandleRoot(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(user.Data.Users) == 0 {
-		// TODO: dar logout...
+		// log error
 		log.Println("HandleRoot > len(userData.Users):", len(user.Data.Users))
+		// clear cookies
+		session.Options.MaxAge = -1
+		if err = session.Save(r, w); err != nil {
+			log.Println("session.Save:", err)
+		}
+		// return to home page
+		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
 		return
 	}
 	log.Println("HandleRoot > channel:", user.Data.Users[0].ID)
