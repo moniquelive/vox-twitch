@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	_ "embed"
+	"encoding/base64"
 	"encoding/gob"
 	"encoding/hex"
 	"fmt"
@@ -17,6 +18,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/moniquelive/vox-twitch/dashboard/cybervox"
 	"github.com/nicklaw5/helix"
+	"github.com/parnurzeal/gorequest"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -388,6 +390,17 @@ func setupCORS(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
 }
 
+type betterTTV struct {
+	UrlTemplate string   `json:"urlTemplate"`
+	Bots        []string `json:"bots"`
+	Emotes      []struct {
+		Id        string `json:"id"`
+		Channel   string `json:"channel"`
+		Code      string `json:"code"`
+		ImageType string `json:"imageType"`
+	} `json:"emotes"`
+}
+
 func HandleTTS(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	setupCORS(w, r)
 	if r.Method == "OPTIONS" {
@@ -418,16 +431,11 @@ func HandleTTS(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-		return []byte(""), nil
+		return base64.StdEncoding.DecodeString("gYPYgF/qbvWe+tp9bmhsXapRyXQATBQcVg1YVelr3Ss=")
 	})
-	//if err != nil {
-	//	log.Println("HandleTTS > error parsing jwt:", err)
-	//	w.WriteHeader(http.StatusInternalServerError)
-	//	return
-	//}
 	channelID := ""
 	userID := ""
-	if claims, ok := token.Claims.(jwt.MapClaims); ok { //&& token.Valid {
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 		channelID = claims["channel_id"].(string)
 		userID = claims["user_id"].(string)
 	} else {
@@ -464,6 +472,21 @@ func HandleTTS(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		userPicture = users.Data.Users[0].ProfileImageURL
 	}
 
+	var emotes map[string]string
+	channel, err := client.GetChannelInformation(&helix.GetChannelInformationParams{BroadcasterID: channelID})
+	if err == nil && len(channel.Data.Channels) == 1 {
+		channelName := channel.Data.Channels[0].BroadcasterName
+		var betterTTV betterTTV
+		_, _, errs := gorequest.New().Get("https://api.betterttv.net/2/channels/" + channelName).
+			EndStruct(&betterTTV)
+		if errs == nil {
+			emotes = make(map[string]string, len(betterTTV.Emotes))
+			for _, emote := range betterTTV.Emotes {
+				emotes[emote.Code] = emote.Id
+			}
+		}
+	}
+
 	// vai na cybervox gerar o audio...
 	text := r.FormValue("text")
 	var url string
@@ -480,6 +503,7 @@ func HandleTTS(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		ClientID:    channelID,
 		AudioURL:    url,
 		Text:        text,
+		Emotes:      emotes,
 		UserName:    userName,
 		UserPicture: userPicture,
 	}

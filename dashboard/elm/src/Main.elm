@@ -3,6 +3,7 @@ port module Main exposing (..)
 import Animation exposing (percent, px)
 import Animation.Messenger
 import Browser
+import Dict exposing (Dict)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Json.Decode as D
@@ -44,6 +45,7 @@ type alias WebsocketMessage =
     { client_id : String
     , audio_url : String
     , text : String
+    , emotes : Emotes
     , username : String
     , user_picture : String
     }
@@ -52,6 +54,7 @@ type alias WebsocketMessage =
 type alias Card =
     { username : String
     , text : String
+    , emotes : Emotes
     , user_picture : String
     , animStyle : Animation.Messenger.State Msg
     }
@@ -62,6 +65,10 @@ type alias Model =
     , audios : List String
     , innerHeight : Float
     }
+
+
+type alias Emotes =
+    Dict String String
 
 
 init : Float -> ( Model, Cmd Msg )
@@ -115,7 +122,7 @@ update msg model =
                                 (Animation.style [ Animation.translate (percent 0) (px model.innerHeight) ])
 
                         newCard =
-                            [ Card ws.username ws.text ws.user_picture newAnimation ]
+                            [ Card ws.username ws.text ws.emotes ws.user_picture newAnimation ]
 
                         newAudio =
                             if String.isEmpty ws.audio_url then
@@ -186,9 +193,28 @@ cardView card =
         [ div [ class "user-picture" ] [ img [ src card.user_picture ] [] ]
         , div [ class "container" ]
             [ div [ class "username" ] [ text <| card.username ++ " disse:" ]
-            , div [ class "text" ] [ text card.text ]
+            , div [ class "text" ] (filterEmote card.emotes card.text)
             ]
         ]
+
+
+filterEmote : Emotes -> String -> List (Html msg)
+filterEmote emotes text =
+    text
+        |> String.split " "
+        |> List.map (mapUrl emotes)
+
+
+mapUrl : Emotes -> String -> Html msg
+mapUrl emotes word =
+    let
+        urlTemplate =
+            "https://cdn.betterttv.net/emote/"
+    in
+    Dict.get word emotes
+        |> Maybe.map (\w -> urlTemplate ++ w ++ "/1x")
+        |> Maybe.map (\url -> img [ src url ] [])
+        |> Maybe.withDefault (text (" " ++ word ++ " "))
 
 
 view : Model -> Html Msg
@@ -202,9 +228,10 @@ view model =
 
 websocketMessageDecoder : D.Decoder WebsocketMessage
 websocketMessageDecoder =
-    D.map5 WebsocketMessage
+    D.map6 WebsocketMessage
         (D.field "client_id" D.string)
         (D.field "audio_url" D.string)
         (D.field "text" D.string)
+        (D.field "emotes" (D.dict D.string))
         (D.field "username" D.string)
         (D.field "user_picture" D.string)
