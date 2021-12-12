@@ -7,6 +7,7 @@ import Dict exposing (Dict)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Json.Decode as D
+import Time
 
 
 
@@ -157,7 +158,8 @@ update msg model =
                                 { card
                                     | animStyle =
                                         Animation.queue
-                                            [ Animation.to [ Animation.translate (percent 115) (percent 0) ]
+                                            [ Animation.wait (Time.millisToPosix <| 3 * 1000)
+                                            , Animation.to [ Animation.translate (percent 115) (percent 0) ]
                                             , Animation.Messenger.send AnimationDone
                                             ]
                                             card.animStyle
