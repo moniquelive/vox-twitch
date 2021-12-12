@@ -67,7 +67,7 @@
     })
     app.ports.playUrl.subscribe(function (url) {
         const audio = new Audio(url)
-        audio.onended = () => app.ports.audioEnded.send(null);
+        audio.onended = () => app.ports.audioEnded.send(audio.src);
         audio.play()
     })
 

@@ -7,7 +7,6 @@ import Dict exposing (Dict)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Json.Decode as D
-import Time
 
 
 
@@ -34,7 +33,7 @@ port playUrl : String -> Cmd msg
 port messageReceiver : (String -> msg) -> Sub msg
 
 
-port audioEnded : (() -> msg) -> Sub msg
+port audioEnded : (String -> msg) -> Sub msg
 
 
 
@@ -56,6 +55,7 @@ type alias Card =
     , text : String
     , emotes : Emotes
     , user_picture : String
+    , audio_url : String
     , animStyle : Animation.Messenger.State Msg
     }
 
@@ -84,7 +84,7 @@ type Msg
     = WebsocketMessageReceived String
     | Animate Animation.Msg
     | AnimationDone
-    | AudioEnded
+    | AudioEnded String
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -115,14 +115,11 @@ update msg model =
                         newAnimation =
                             Animation.interrupt
                                 [ Animation.to [ Animation.translate (percent 0) (px 0) ]
-                                , Animation.wait (Time.millisToPosix <| 15 * 1000)
-                                , Animation.to [ Animation.translate (percent 115) (percent 0) ]
-                                , Animation.Messenger.send AnimationDone
                                 ]
                                 (Animation.style [ Animation.translate (percent 0) (px model.innerHeight) ])
 
                         newCard =
-                            [ Card ws.username ws.text ws.emotes ws.user_picture newAnimation ]
+                            [ Card ws.username ws.text ws.emotes ws.user_picture ws.audio_url newAnimation ]
 
                         newAudio =
                             if String.isEmpty ws.audio_url then
@@ -151,8 +148,26 @@ update msg model =
         AnimationDone ->
             ( { model | cards = List.drop 1 model.cards }, Cmd.none )
 
-        AudioEnded ->
+        AudioEnded audio_url ->
             let
+                newCards =
+                    List.map
+                        (\card ->
+                            if card.audio_url == audio_url then
+                                { card
+                                    | animStyle =
+                                        Animation.queue
+                                            [ Animation.to [ Animation.translate (percent 115) (percent 0) ]
+                                            , Animation.Messenger.send AnimationDone
+                                            ]
+                                            card.animStyle
+                                }
+
+                            else
+                                card
+                        )
+                        model.cards
+
                 newAudios =
                     List.drop 1 model.audios
 
@@ -164,7 +179,7 @@ update msg model =
                         Nothing ->
                             Cmd.none
             in
-            ( { model | audios = newAudios }, cmd )
+            ( { model | audios = newAudios, cards = newCards }, cmd )
 
 
 
@@ -175,7 +190,7 @@ subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
         [ messageReceiver WebsocketMessageReceived
-        , audioEnded (always AudioEnded)
+        , audioEnded AudioEnded
         , Animation.subscription Animate <| List.map .animStyle model.cards
         ]
 
