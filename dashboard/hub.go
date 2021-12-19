@@ -55,8 +55,9 @@ func (h *Hub) run() {
 			h.printStatus()
 		case client := <-h.unregister:
 			if c, ok := h.clients[client.id]; ok {
+				c.cybervoxMutex.Lock()
 				c.cybervoxWS.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
-				c.cybervoxWS.Close()
+				c.cybervoxMutex.Unlock()
 				delete(h.clients, client.id)
 				close(client.send)
 				h.printStatus()

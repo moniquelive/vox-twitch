@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -46,7 +47,8 @@ type Client struct {
 	send chan *Message
 
 	// CyberVox API websocket
-	cybervoxWS *websocket.Conn
+	cybervoxMutex sync.Mutex
+	cybervoxWS    *websocket.Conn
 }
 
 // readPump pumps messages from the websocket connection to the hub.
@@ -106,16 +108,21 @@ func (c *Client) writePump() {
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				return
 			}
+			c.cybervoxMutex.Lock()
 			c.cybervoxWS.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := c.cybervoxWS.WriteMessage(websocket.PingMessage, nil); err != nil {
+				c.cybervoxMutex.Unlock()
 				return
 			}
+			c.cybervoxMutex.Unlock()
 		}
 	}
 }
 
 func (c *Client) TTS(text string) (string, error) {
+	c.cybervoxMutex.Lock()
 	ttsResponse := cybervox.TTS(c.cybervoxWS, text, "perola")
+	c.cybervoxMutex.Unlock()
 	if !ttsResponse.Payload.Success {
 		return "", fmt.Errorf("client.TTS failed: %q", ttsResponse.Payload.Reason)
 	}
