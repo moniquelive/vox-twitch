@@ -110,11 +110,11 @@ func (c *Client) writePump() {
 			}
 			c.cybervoxMutex.Lock()
 			c.cybervoxWS.SetWriteDeadline(time.Now().Add(writeWait))
-			if err := c.cybervoxWS.WriteMessage(websocket.PingMessage, nil); err != nil {
-				c.cybervoxMutex.Unlock()
+			err := c.cybervoxWS.WriteMessage(websocket.PingMessage, nil)
+			c.cybervoxMutex.Unlock()
+			if err != nil {
 				return
 			}
-			c.cybervoxMutex.Unlock()
 		}
 	}
 }
