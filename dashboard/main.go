@@ -12,6 +12,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/golang-jwt/jwt"
 	"github.com/gorilla/sessions"
@@ -472,12 +473,31 @@ func HandleTTS(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		userPicture = users.Data.Users[0].ProfileImageURL
 	}
 
+	// vai na cybervox gerar o audio...
+	text := r.FormValue("text")
+	var audioURL string
+	if c, ok := hub.clients[channelID]; ok {
+		var err error
+		for {
+			audioURL, err = c.TTS(text)
+			if err == nil || !strings.Contains(err.Error(), "busy") {
+				break
+			}
+			time.Sleep(time.Second)
+		}
+		if err != nil {
+			log.Println("HandleTTS > error calling cybervox:", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	}
+
 	var emotes map[string]string
 	channel, err := client.GetChannelInformation(&helix.GetChannelInformationParams{BroadcasterID: channelID})
 	if err == nil && len(channel.Data.Channels) == 1 {
-		channelName := channel.Data.Channels[0].BroadcasterName
 		var betterTTV betterTTV
-		_, _, errs := gorequest.New().Get("https://api.betterttv.net/2/channels/" + channelName).
+		_, _, errs := gorequest.New().
+			Get("https://api.betterttv.net/2/channels/" + channel.Data.Channels[0].BroadcasterName).
 			EndStruct(&betterTTV)
 		if errs == nil {
 			emotes = make(map[string]string, len(betterTTV.Emotes))
@@ -487,21 +507,10 @@ func HandleTTS(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// vai na cybervox gerar o audio...
-	text := r.FormValue("text")
-	var url string
-	if c, ok := hub.clients[channelID]; ok {
-		var err error
-		if url, err = c.TTS(text); err != nil {
-			log.Println("HandleTTS > error calling cybervox:", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-	}
 	// manda url do audio para o websocket do canal
 	hub.broadcast <- &Message{
 		ClientID:    channelID,
-		AudioURL:    url,
+		AudioURL:    audioURL,
 		Text:        text,
 		Emotes:      emotes,
 		UserName:    userName,
