@@ -3,7 +3,6 @@
 .oauth_client*
 .vox_client*
 **/node_modules
-Dockerfile
 elm-stuff
 *.min.js
 spike
