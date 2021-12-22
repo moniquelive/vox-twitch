@@ -446,7 +446,8 @@ func HandleTTS(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	// verifica se canal está on
 	if _, found := hub.clients[channelID]; !found {
 		log.Println("HandleTTS > hub.clients not found:", channelID)
-		w.WriteHeader(http.StatusInternalServerError)
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(fmt.Sprintf("channel %v is not online", channelID)))
 		return
 	}
 
