@@ -140,7 +140,7 @@ view : Model -> Html Msg
 view model =
     div [ class "card-body" ]
         [ header []
-            [ img [ alt "Logo CyberVox", src "https://i1.wp.com/cybervox.ai/wp-content/uploads/sites/11/LOGO_footer_cybervox.png" ]
+            [ img [ alt "Logo CyberVox", src "img/LOGO_footer_cybervox.png" ]
                 []
             ]
         , article []
