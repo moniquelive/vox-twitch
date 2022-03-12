@@ -8,7 +8,6 @@ zip -r deploy.zip \
   elm.min.js \
   index.js \
   live_config.js \
-  twitch-ext.min.js \
   viewer.js \
   \
   config.html \
