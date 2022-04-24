@@ -7,7 +7,6 @@ package main
 import (
 	"log"
 
-	"github.com/gorilla/websocket"
 	"github.com/nicklaw5/helix"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -55,9 +54,12 @@ func (h *Hub) run() {
 			h.printStatus()
 		case client := <-h.unregister:
 			if c, ok := h.clients[client.id]; ok {
-				c.cybervoxMutex.Lock()
-				c.cybervoxWS.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
-				c.cybervoxMutex.Unlock()
+				if c.amqpChan != nil {
+					c.amqpChan.Close()
+				}
+				if c.amqpConn != nil {
+					c.amqpConn.Close()
+				}
 				delete(h.clients, client.id)
 				close(client.send)
 				h.printStatus()

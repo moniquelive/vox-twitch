@@ -6,13 +6,16 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
-	"github.com/moniquelive/vox-twitch/dashboard/cybervox"
+	"github.com/streadway/amqp"
 )
 
 const (
@@ -46,9 +49,16 @@ type Client struct {
 	// Buffered channel of outbound messages.
 	send chan *Message
 
-	// CyberVox API websocket
-	cybervoxMutex sync.Mutex
-	cybervoxWS    *websocket.Conn
+	// RabbitMQ connection and channel
+	amqpMutex sync.Mutex
+	amqpConn  *amqp.Connection
+	amqpChan  *amqp.Channel
+}
+
+type ttsResponse struct {
+	Success bool   `json:"success"`
+	AudioID string `json:"audio_id"`
+	Reason  string `json:"reason"`
 }
 
 // readPump pumps messages from the websocket connection to the hub.
@@ -108,23 +118,75 @@ func (c *Client) writePump() {
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				return
 			}
-			c.cybervoxMutex.Lock()
-			c.cybervoxWS.SetWriteDeadline(time.Now().Add(writeWait))
-			err := c.cybervoxWS.WriteMessage(websocket.PingMessage, nil)
-			c.cybervoxMutex.Unlock()
-			if err != nil {
-				return
-			}
 		}
 	}
 }
 
 func (c *Client) TTS(text string) (string, error) {
-	c.cybervoxMutex.Lock()
-	ttsResponse := cybervox.TTS(c.cybervoxWS, text, "perola")
-	c.cybervoxMutex.Unlock()
-	if !ttsResponse.Payload.Success {
-		return "", fmt.Errorf("client.TTS failed: %q", ttsResponse.Payload.Reason)
+	c.amqpMutex.Lock()
+	defer c.amqpMutex.Unlock()
+
+	// start model response consumer
+	consumerID := uuid.New().String()
+	responseCh, err := c.amqpChan.Consume(
+		"amq.rabbitmq.reply-to", // queue
+		consumerID,              // consumer
+		true,                    // auto-ack
+		false,                   // exclusive
+		false,                   // no-local
+		false,                   // no-wait
+		nil,                     // args
+	)
+	if err != nil {
+		return "", fmt.Errorf("failed to register the response consumer: %w", err)
 	}
-	return "https://api.cybervox.ai" + ttsResponse.Payload.AudioURL, nil
+	defer func() {
+		if err := c.amqpChan.Cancel(consumerID, false); err != nil {
+			log.Println("failed to cancel the response consumer:", err)
+		}
+	}()
+
+	requestBody, _ := json.Marshal(struct {
+		Action string `json:"action"`
+		Text   string `json:"text"`
+	}{
+		Action: "tts",
+		Text:   text,
+	})
+	// send tts request to MQ
+	correlationID := uuid.New().String()
+	err = c.amqpChan.Publish(
+		"",            // exchange
+		"ms.vox_fala", // routing key
+		false,         // mandatory
+		false,         // immediate
+		amqp.Publishing{
+			ContentType:   "text/plain",
+			Body:          requestBody,
+			DeliveryMode:  amqp.Persistent,
+			Expiration:    "60000",
+			CorrelationId: correlationID,
+			ReplyTo:       "amq.rabbitmq.reply-to",
+		})
+	if err != nil {
+		return "", fmt.Errorf("publish message: %w", err)
+	}
+
+	timeoutTimer := time.NewTimer(5 * time.Minute)
+	defer timeoutTimer.Stop()
+	var responseBody []byte
+	select {
+	case d := <-responseCh:
+		// assert correlationID == d.CorrelationId
+		responseBody = d.Body
+		break
+	case <-timeoutTimer.C:
+		return "", errors.New("timeout")
+	}
+	var response *ttsResponse
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return "", fmt.Errorf("json unmarshal: %w", err)
+	}
+	return "https://vox-twitch.monique.dev/ttsPlay/" + response.AudioID, nil
 }

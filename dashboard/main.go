@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	_ "embed"
 	"encoding/base64"
@@ -11,18 +12,20 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
+	"github.com/go-redis/redis/v8"
 	"github.com/golang-jwt/jwt"
 	"github.com/gorilla/sessions"
 	"github.com/gorilla/websocket"
-	"github.com/moniquelive/vox-twitch/dashboard/cybervox"
 	"github.com/nicklaw5/helix"
 	"github.com/parnurzeal/gorequest"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/streadway/amqp"
 )
 
 // soundalerts.com pede:
@@ -363,20 +366,25 @@ func HandleWebsocket(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Connect to Cybervox API websocket
-	var cybervoxWS *websocket.Conn
-	if cybervoxWS, _, err = cybervox.Dial(voxClientID, voxClientSecret); err != nil {
-		log.Println("HandleWebsocket: cybervox connect error:", err)
-		return
+	client := &Client{
+		id:   userID,
+		hub:  hub,
+		conn: conn,
+		send: make(chan *Message, 256),
 	}
 
-	client := &Client{
-		id:         userID,
-		hub:        hub,
-		conn:       conn,
-		cybervoxWS: cybervoxWS,
-		send:       make(chan *Message, 256),
+	// Connect to Perola's RabbitMQ
+	amqpURL := os.Getenv("RABBITMQ_URL")
+	if client.amqpConn, err = amqp.Dial(amqpURL); err != nil {
+		log.Println("MQ connection:", err)
 	}
+	if client.amqpChan, err = client.amqpConn.Channel(); err != nil {
+		log.Println("MQ channel:", err)
+	}
+	if err = client.amqpChan.Qos(1, 0, false); err != nil {
+		log.Println("MQ channel QoS:", err)
+	}
+
 	client.hub.register <- client
 
 	// Allow collection of memory referenced by the caller by doing all work in
@@ -385,7 +393,7 @@ func HandleWebsocket(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	go client.readPump()
 }
 
-func setupCORS(w http.ResponseWriter, req *http.Request) {
+func setupCORS(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
 	w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
@@ -519,13 +527,35 @@ func HandleTTS(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func HandleTTSPlay(redisConn *redis.Client, w http.ResponseWriter, r *http.Request) {
+	audioID := strings.TrimPrefix(r.URL.Path, "/ttsPlay/")
+	b := redisConn.Get(context.Background(), audioID)
+	if b.Err() != nil {
+		log.Printf("audio (%q) not found: %v", audioID, b.Err())
+		http.NotFound(w, r)
+		return
+	}
+	bb, err := b.Bytes()
+	if err != nil {
+		log.Println("error getting bytes:", err)
+		http.Error(w, "error getting bytes", http.StatusInternalServerError)
+		return
+	}
+	http.ServeContent(w, r, "audio.wav", time.Time{}, bytes.NewReader(bb))
+}
+
 func main() {
 	// Gob encoding for helix/AccessCredentials
 	gob.Register(&helix.AccessCredentials{})
 
-	// TODO: hub se conecta no cybervox...
 	hub := newHub()
 	go hub.run()
+
+	redisURL := os.Getenv("REDIS_URL")
+	if !strings.HasSuffix(redisURL, ":6379") {
+		redisURL = redisURL + ":6379"
+	}
+	redisConn := redis.NewClient(&redis.Options{Addr: redisURL})
 
 	mux := http.DefaultServeMux
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -541,6 +571,9 @@ func main() {
 	})
 	mux.HandleFunc("/tts/", func(w http.ResponseWriter, r *http.Request) {
 		HandleTTS(hub, w, r)
+	})
+	mux.HandleFunc("/ttsPlay/", func(w http.ResponseWriter, r *http.Request) {
+		HandleTTSPlay(redisConn, w, r)
 	})
 	mux.HandleFunc("/elm.min.js", func(w http.ResponseWriter, r *http.Request) {
 		if _, err := w.Write(elmMinJs); err != nil {
