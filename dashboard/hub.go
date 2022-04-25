@@ -6,9 +6,11 @@ package main
 
 import (
 	"log"
+	"strings"
 
 	"github.com/nicklaw5/helix"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 type Message struct {
@@ -35,6 +37,29 @@ type Hub struct {
 	// Unregister requests from clients.
 	unregister chan *Client
 }
+
+type TwitchUser struct {
+	//Id          string    `json:"_id"`
+	//Type        string    `json:"type"`
+	//Bio         string    `json:"bio"`
+	//CreatedAt   time.Time `json:"created_at"`
+	//UpdatedAt   time.Time `json:"updated_at"`
+	DisplayName string `json:"display_name"`
+	Name        string `json:"name"`
+	Logo        string `json:"logo"`
+}
+
+var (
+	usersConnected = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "vox_twitch_connected_users_total",
+		Help: "The total number of connected users",
+	})
+	ttsGenerated = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "vox_twitch_generated_tts_total",
+		Help: "The total number of tts messages spoken",
+	}, []string{"channel_id"},
+	)
+)
 
 func newHub() *Hub {
 	return &Hub{
@@ -78,30 +103,12 @@ func (h *Hub) run() {
 }
 
 func (h *Hub) printStatus() {
-	clients := ""
-	for c := range h.clients {
-		clients += "\n" + c
-	}
-	log.Println("canais\n------------", clients)
-}
-
-type TwitchUser struct {
-	//Id          string    `json:"_id"`
-	//Type        string    `json:"type"`
-	//Bio         string    `json:"bio"`
-	//CreatedAt   time.Time `json:"created_at"`
-	//UpdatedAt   time.Time `json:"updated_at"`
-	DisplayName string `json:"display_name"`
-	Name        string `json:"name"`
-	Logo        string `json:"logo"`
+	log.Println("Canais:\n------------\n",
+		strings.Join(clientIDs(h.clients), "\n"))
 }
 
 func (h *Hub) Online(client *helix.Client) (online []TwitchUser) {
-	ids := make([]string, 0, len(h.clients))
-	for c := range h.clients {
-		ids = append(ids, c)
-	}
-	resp, err := client.GetUsers(&helix.UsersParams{IDs: ids})
+	resp, err := client.GetUsers(&helix.UsersParams{IDs: clientIDs(h.clients)})
 	if err != nil {
 		return
 	}
@@ -111,6 +118,14 @@ func (h *Hub) Online(client *helix.Client) (online []TwitchUser) {
 			Name:        user.Login,
 			Logo:        user.ProfileImageURL,
 		})
+	}
+	return
+}
+
+func clientIDs(clients map[string]*Client) (keys []string) {
+	keys = make([]string, 0, len(clients))
+	for k := range clients {
+		keys = append(keys, k)
 	}
 	return
 }
